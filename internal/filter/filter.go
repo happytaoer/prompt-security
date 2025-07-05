@@ -14,6 +14,7 @@ const (
 	SensitiveTypePhone      = "phone"
 	SensitiveTypeCreditCard = "credit_card"
 	SensitiveTypeSSN        = "ssn"
+	SensitiveTypeIPV4       = "ipv4"
 	SensitiveTypeAPIKey     = "api_key"
 )
 
@@ -78,6 +79,11 @@ func SensitiveData(text string, cfg config.Config) (string, bool, ReplacementSum
 	// Filter SSNs
 	if cfg.DetectSSNs {
 		findAndReplaceRegex(patterns.SSNPattern, cfg.SSNReplacement, SensitiveTypeSSN)
+	}
+
+	// Filter IPv4 addresses
+	if cfg.DetectIPV4 {
+		findAndReplaceRegex(patterns.IPV4Pattern, cfg.IPV4Replacement, SensitiveTypeIPV4)
 	}
 
 	// Filter string match patterns

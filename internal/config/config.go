@@ -22,6 +22,7 @@ type Config struct {
 	DetectPhones      bool `json:"detect_phones"`
 	DetectCreditCards bool `json:"detect_credit_cards"`
 	DetectSSNs        bool `json:"detect_ssns"`
+	DetectIPV4        bool `json:"detect_ipv4"`
 
 	// String match patterns
 	StringMatchPatterns []StringMatchPattern `json:"string_match_patterns"`
@@ -31,6 +32,7 @@ type Config struct {
 	PhoneReplacement      string `json:"phone_replacement"`
 	CreditCardReplacement string `json:"credit_card_replacement"`
 	SSNReplacement        string `json:"ssn_replacement"`
+	IPV4Replacement       string `json:"ipv4_replacement"`
 	APIKeyReplacement     string `json:"api_key_replacement"`
 
 	// Monitoring settings
@@ -45,6 +47,7 @@ func DefaultConfig() Config {
 		DetectPhones:      true,
 		DetectCreditCards: true,
 		DetectSSNs:        true,
+		DetectIPV4:        true,
 
 		StringMatchPatterns: []StringMatchPattern{},
 
@@ -52,6 +55,7 @@ func DefaultConfig() Config {
 		PhoneReplacement:      "+1-555-123-4567",
 		CreditCardReplacement: "XXXX-XXXX-XXXX-XXXX",
 		SSNReplacement:        "XXX-XX-XXXX",
+		IPV4Replacement:       "0.0.0.0",
 
 		MonitoringInterval: 500,
 		NotifyOnFilter:     true,
@@ -137,6 +141,12 @@ func Show(config Config) {
 	fmt.Printf("Detect SSNs: %v", config.DetectSSNs)
 	if config.DetectSSNs {
 		fmt.Printf(" (Replacement: %s)", config.SSNReplacement)
+	}
+	fmt.Println()
+
+	fmt.Printf("Detect IPv4 Addresses: %v", config.DetectIPV4)
+	if config.DetectIPV4 {
+		fmt.Printf(" (Replacement: %s)", config.IPV4Replacement)
 	}
 	fmt.Println()
 

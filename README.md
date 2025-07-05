@@ -37,6 +37,7 @@ go build -o prompt-security
   - Phone numbers
   - Credit card numbers
   - Social Security Numbers (SSN)
+  - IPv4 addresses
   - Custom string patterns (exact match)
 - **Configurable rules and replacements**
 - **Easy CLI, zero config required to start**
@@ -79,6 +80,7 @@ When you run the application for the first time, a configuration file will be au
   "detect_phones": true,
   "detect_credit_cards": true,
   "detect_ssns": true,
+  "detect_ipv4": true,
   "string_match_patterns": [
     {
       "name": "company_name",
@@ -97,6 +99,7 @@ When you run the application for the first time, a configuration file will be au
   "phone_replacement": "+1-555-123-4567",
   "credit_card_replacement": "XXXX-XXXX-XXXX-XXXX",
   "ssn_replacement": "XXX-XX-XXXX",
+  "ipv4_replacement": "0.0.0.0",
   "monitoring_interval_ms": 500,
   "notify_on_filter": true
 }
@@ -111,6 +114,7 @@ When you run the application for the first time, a configuration file will be au
 - Phone: `(\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}`
 - Credit Card: `\b(?:\d{4}[- ]?){3}\d{4}\b`
 - SSN: `\b\d{3}-\d{2}-\d{4}\b`
+- IPv4: `\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`
 
 ### 2. Exact String Match
 Configure custom sensitive words, project names, company names, etc. in `string_match_patterns`:
