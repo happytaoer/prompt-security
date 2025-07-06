@@ -27,6 +27,13 @@ type Config struct {
 	// String match patterns
 	StringMatchPatterns []StringMatchPattern `json:"string_match_patterns"`
 
+	// Custom regular expression patterns (empty string means use default)
+	CustomEmailPattern      string `json:"custom_email_pattern"`
+	CustomPhonePattern      string `json:"custom_phone_pattern"`
+	CustomCreditCardPattern string `json:"custom_credit_card_pattern"`
+	CustomSSNPattern        string `json:"custom_ssn_pattern"`
+	CustomIPV4Pattern       string `json:"custom_ipv4_pattern"`
+
 	// Replacements
 	EmailReplacement      string `json:"email_replacement"`
 	PhoneReplacement      string `json:"phone_replacement"`
@@ -83,6 +90,7 @@ func Load() (Config, error) {
 
 	// Read config file
 	data, err := os.ReadFile(configPath)
+
 	if err != nil {
 		return DefaultConfig(), fmt.Errorf("failed to read config file: %v", err)
 	}
@@ -123,30 +131,45 @@ func Show(config Config) {
 	fmt.Printf("Detect Emails: %v", config.DetectEmails)
 	if config.DetectEmails {
 		fmt.Printf(" (Replacement: %s)", config.EmailReplacement)
+		if config.CustomEmailPattern != "" {
+			fmt.Printf("\nCustom Email Pattern: %s", config.CustomEmailPattern)
+		}
 	}
 	fmt.Println()
 
 	fmt.Printf("Detect Phone Numbers: %v", config.DetectPhones)
 	if config.DetectPhones {
 		fmt.Printf(" (Replacement: %s)", config.PhoneReplacement)
+		if config.CustomPhonePattern != "" {
+			fmt.Printf("\nCustom Phone Pattern: %s", config.CustomPhonePattern)
+		}
 	}
 	fmt.Println()
 
 	fmt.Printf("Detect Credit Cards: %v", config.DetectCreditCards)
 	if config.DetectCreditCards {
 		fmt.Printf(" (Replacement: %s)", config.CreditCardReplacement)
+		if config.CustomCreditCardPattern != "" {
+			fmt.Printf("\nCustom Credit Card Pattern: %s", config.CustomCreditCardPattern)
+		}
 	}
 	fmt.Println()
 
 	fmt.Printf("Detect SSNs: %v", config.DetectSSNs)
 	if config.DetectSSNs {
 		fmt.Printf(" (Replacement: %s)", config.SSNReplacement)
+		if config.CustomSSNPattern != "" {
+			fmt.Printf("\nCustom SSN Pattern: %s", config.CustomSSNPattern)
+		}
 	}
 	fmt.Println()
 
 	fmt.Printf("Detect IPv4 Addresses: %v", config.DetectIPV4)
 	if config.DetectIPV4 {
 		fmt.Printf(" (Replacement: %s)", config.IPV4Replacement)
+		if config.CustomIPV4Pattern != "" {
+			fmt.Printf("\nCustom IPv4 Pattern: %s", config.CustomIPV4Pattern)
+		}
 	}
 	fmt.Println()
 

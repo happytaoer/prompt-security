@@ -63,27 +63,27 @@ func SensitiveData(text string, cfg config.Config) (string, bool, ReplacementSum
 
 	// Filter emails
 	if cfg.DetectEmails {
-		findAndReplaceRegex(patterns.EmailPattern, cfg.EmailReplacement, SensitiveTypeEmail)
+		findAndReplaceRegex(patterns.GetEmailPattern(&cfg), cfg.EmailReplacement, SensitiveTypeEmail)
 	}
 
 	// Filter phone numbers
 	if cfg.DetectPhones {
-		findAndReplaceRegex(patterns.PhonePattern, cfg.PhoneReplacement, SensitiveTypePhone)
+		findAndReplaceRegex(patterns.GetPhonePattern(&cfg), cfg.PhoneReplacement, SensitiveTypePhone)
 	}
 
 	// Filter credit card numbers
 	if cfg.DetectCreditCards {
-		findAndReplaceRegex(patterns.CreditCardPattern, cfg.CreditCardReplacement, SensitiveTypeCreditCard)
+		findAndReplaceRegex(patterns.GetCreditCardPattern(&cfg), cfg.CreditCardReplacement, SensitiveTypeCreditCard)
 	}
 
 	// Filter SSNs
 	if cfg.DetectSSNs {
-		findAndReplaceRegex(patterns.SSNPattern, cfg.SSNReplacement, SensitiveTypeSSN)
+		findAndReplaceRegex(patterns.GetSSNPattern(&cfg), cfg.SSNReplacement, SensitiveTypeSSN)
 	}
 
 	// Filter IPv4 addresses
 	if cfg.DetectIPV4 {
-		findAndReplaceRegex(patterns.IPV4Pattern, cfg.IPV4Replacement, SensitiveTypeIPV4)
+		findAndReplaceRegex(patterns.GetIPV4Pattern(&cfg), cfg.IPV4Replacement, SensitiveTypeIPV4)
 	}
 
 	// Filter string match patterns

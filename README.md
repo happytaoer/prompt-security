@@ -95,6 +95,11 @@ When you run the application for the first time, a configuration file will be au
       "replacement": "[PROJECT NAME]"
     }
   ],
+  "custom_email_pattern": "",
+  "custom_phone_pattern": "",
+  "custom_credit_card_pattern": "",
+  "custom_ssn_pattern": "",
+  "custom_ipv4_pattern": "",
   "email_replacement": "security@example.com",
   "phone_replacement": "+1-555-123-4567",
   "credit_card_replacement": "XXXX-XXXX-XXXX-XXXX",
@@ -110,11 +115,30 @@ When you run the application for the first time, a configuration file will be au
 ## 🧩 Pattern Types
 
 ### 1. Regular Expression Detection
+
+#### Default Patterns
 - Email: `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`
 - Phone: `(\+\d{1,3}[\s-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}`
 - Credit Card: `\b(?:\d{4}[- ]?){3}\d{4}\b`
 - SSN: `\b\d{3}-\d{2}-\d{4}\b`
 - IPv4: `\b((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b`
+
+#### Custom Regex Patterns
+You can define your own regular expressions for each sensitive data type by setting the following fields in the config file:
+
+```json
+{
+  "custom_email_pattern": "your-custom-email-regex",
+  "custom_phone_pattern": "your-custom-phone-regex",
+  "custom_credit_card_pattern": "your-custom-credit-card-regex",
+  "custom_ssn_pattern": "your-custom-ssn-regex",
+  "custom_ipv4_pattern": "your-custom-ipv4-regex"
+}
+```
+
+- Leave a field empty (`""`) to use the default pattern
+- If your custom pattern is invalid, the system will automatically fall back to the default pattern
+- Custom patterns allow you to adapt to region-specific formats (e.g., different phone number formats) or add additional security rules
 
 ### 2. Exact String Match
 Configure custom sensitive words, project names, company names, etc. in `string_match_patterns`:
