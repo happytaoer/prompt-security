@@ -73,6 +73,7 @@ When you run the application for the first time, a configuration file will be au
 - Automatically created on first run; if corrupted or deleted, it will be restored to default
 - Main configuration logic is in `internal/config/config.go`
 - Main fields:
+- Note: If you use the `--interval` flag with the CLI, it will override the `monitoring_interval_ms` value in the config file for that run.
 
 ```json
 {
@@ -171,6 +172,12 @@ This way, any sensitive content you copy will be safely replaced before pasting 
   ```bash
   ./prompt-security monitor
   ```
+  
+  You can use the `--interval` flag to override the monitoring interval (in milliseconds) from the command line:
+  ```bash
+  ./prompt-security monitor --interval 200
+  ```
+  This will check the clipboard every 200 milliseconds, regardless of the value in the config file.
 - View current configuration:
   ```bash
   ./prompt-security config

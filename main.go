@@ -29,9 +29,16 @@ func main() {
 		Use:   "monitor",
 		Short: "Start monitoring clipboard",
 		Run: func(cmd *cobra.Command, args []string) {
+			// Check if interval flag is set, and override config if it is
+			if interval, _ := cmd.Flags().GetInt("interval"); interval > 0 {
+				cfg.MonitoringInterval = interval
+			}
 			monitor.Clipboard(cfg)
 		},
 	}
+
+	// Add flags to monitor command
+	monitorCmd.Flags().Int("interval", 0, "Override monitoring interval in milliseconds")
 
 	// Config command
 	var configCmd = &cobra.Command{
