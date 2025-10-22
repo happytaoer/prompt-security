@@ -40,7 +40,6 @@ type Config struct {
 	CreditCardReplacement string `json:"credit_card_replacement"`
 	SSNReplacement        string `json:"ssn_replacement"`
 	IPV4Replacement       string `json:"ipv4_replacement"`
-	APIKeyReplacement     string `json:"api_key_replacement"`
 
 	// Monitoring settings
 	MonitoringInterval int  `json:"monitoring_interval_ms"` // in milliseconds
