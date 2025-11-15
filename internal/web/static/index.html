@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Security - Configuration & Logs</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --text-muted: #666666;
+            --border-color: #eeeeee;
+            --card-bg: #f9f9f9;
+            --primary: #000000;
+            --primary-hover: #333333;
+            --success-bg: #f0f0f0;
+            --success-text: #000000;
+            --error-bg: #f0f0f0;
+            --error-text: #000000;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            padding: 1rem 0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .dashboard-layout {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+        }
+
+        .sidebar {
+            width: 240px;
+            flex-shrink: 0;
+        }
+
+        .main-content {
+            flex-grow: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .header h1 {
+            margin-bottom: 0.25rem;
+            font-size: 1.75rem;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .tabs {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .sidebar-title {
+            padding: 0.75rem 1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .tab {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: var(--text-muted);
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+            border-radius: 0.375rem;
+            text-align: left;
+            border-left: 3px solid transparent;
+        }
+
+        .sub-tab {
+            padding-left: 2rem;
+        }
+
+        .tab:hover {
+            color: var(--text-color);
+            background-color: transparent !important; /* Ensure no background on hover */
+        }
+
+        .tab.active {
+            color: var(--text-color);
+            font-weight: 600;
+            background-color: var(--card-bg);
+        }
+
+        .tab.active:not(.sub-tab) {
+             border-left-color: var(--text-color);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .config-section {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            background: var(--card-bg);
+            border-radius: 0.375rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .config-section h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .config-section label {
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .config-section label input[type="checkbox"] {
+            margin: 0;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .form-row label {
+            margin-bottom: 0;
+            font-size: 0.875rem;
+        }
+
+        .form-row input {
+            font-size: 0.875rem;
+            padding: 0.5rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        /* Logs Table */
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            overflow: hidden;
+        }
+
+        .logs-table thead {
+            background: var(--bg-color);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .logs-table th {
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logs-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .logs-table tbody tr:hover {
+            background: var(--bg-color);
+        }
+
+        .logs-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .logs-table th:nth-child(1),
+        .logs-table td:nth-child(1) {
+            width: 180px;
+        }
+
+        .logs-table th:nth-child(4),
+        .logs-table td:nth-child(4) {
+            width: 150px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .button-group button {
+            font-size: 0.875rem;
+            padding: 0.5rem 1rem;
+        }
+
+        .success-message, .error-message {
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.875rem;
+            display: none;
+        }
+
+        .success-message {
+            background: var(--success-bg);
+            color: var(--success-text);
+            border: 1px solid var(--border-color);
+        }
+
+        .error-message {
+            background: var(--error-bg);
+            color: var(--error-text);
+            border: 1px solid var(--border-color);
+        }
+
+        .pattern-list {
+            margin-top: 1rem;
+        }
+
+        .pattern-item {
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+        }
+
+        .pattern-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-card {
+            padding: 1rem;
+            background: var(--card-bg);
+            border-radius: 0.375rem;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card .label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        /* Form Elements */
+        input[type="text"],
+        input[type="number"] {
+            width: 100%;
+            padding: 0.5rem;
+            font-size: 0.875rem;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus {
+            outline: none;
+            border-color: var(--text-color);
+        }
+
+        input[type="checkbox"] {
+            width: 1.25rem;
+            height: 1.25rem;
+            cursor: pointer;
+        }
+
+        label {
+            display: block;
+            cursor: pointer;
+        }
+
+        /* Buttons */
+        button {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            border: 1px solid var(--text-color);
+            border-radius: 0.375rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        button:hover {
+            background-color: var(--text-color);
+            color: var(--bg-color);
+        }
+
+        button.secondary {
+            background-color: var(--bg-color);
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+        }
+
+        button.secondary:hover {
+            background-color: var(--text-muted);
+            color: var(--bg-color);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .pagination button {
+            min-width: 100px;
+        }
+
+        .pagination span {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            min-width: 100px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <div class="header">
+            <h1>🛡️ Prompt Security</h1>
+            <p>Configuration & Monitoring Dashboard</p>
+        </div>
+
+        <div class="dashboard-layout">
+            <aside class="sidebar">
+                <div class="tabs">
+                    <div class="sidebar-title">Configuration</div>
+                    <button class="tab sub-tab active" onclick="switchConfigSection('detection')">Detection</button>
+                    <button class="tab sub-tab" onclick="switchConfigSection('replacement')">Replacement</button>
+                    <button class="tab sub-tab" onclick="switchConfigSection('monitoring')">Monitoring</button>
+                    <button class="tab sub-tab" onclick="switchConfigSection('custom_patterns')">Custom Patterns</button>
+                    <hr style="border-color: var(--border-color); margin: 0.5rem 0;"/>
+                    <button class="tab" onclick="switchTab('logs')">Logs</button>
+                </div>
+            </aside>
+            <div class="main-content">
+
+        <!-- Configuration Tab -->
+        <div id="config-tab" class="tab-content active">
+            <div class="success-message" id="config-success">Configuration saved successfully!</div>
+            <div class="error-message" id="config-error"></div>
+
+            <form id="config-form">
+                <!-- Detection Settings -->
+                <div id="detection-section" class="config-section">
+                    <h3>🔍 Detection Settings</h3>
+                    <label>
+                        <input type="checkbox" id="detect_emails" name="detect_emails">
+                        Detect Email Addresses
+                    </label>
+                    <label>
+                        <input type="checkbox" id="detect_phones" name="detect_phones">
+                        Detect Phone Numbers
+                    </label>
+                    <label>
+                        <input type="checkbox" id="detect_credit_cards" name="detect_credit_cards">
+                        Detect Credit Card Numbers
+                    </label>
+                    <label>
+                        <input type="checkbox" id="detect_ssns" name="detect_ssns">
+                        Detect Social Security Numbers
+                    </label>
+                    <label>
+                        <input type="checkbox" id="detect_ipv4" name="detect_ipv4">
+                        Detect IPv4 Addresses
+                    </label>
+                </div>
+
+                <!-- Replacement Settings -->
+                <div id="replacement-section" class="config-section" style="display: none;">
+                    <h3>🔄 Replacement Values</h3>
+                    <div class="form-row">
+                        <label for="email_replacement">Email Replacement:</label>
+                        <input type="text" id="email_replacement" name="email_replacement" placeholder="[EMAIL]">
+                    </div>
+                    <div class="form-row">
+                        <label for="phone_replacement">Phone Replacement:</label>
+                        <input type="text" id="phone_replacement" name="phone_replacement" placeholder="[PHONE]">
+                    </div>
+                    <div class="form-row">
+                        <label for="credit_card_replacement">Credit Card Replacement:</label>
+                        <input type="text" id="credit_card_replacement" name="credit_card_replacement" placeholder="[CARD]">
+                    </div>
+                    <div class="form-row">
+                        <label for="ssn_replacement">SSN Replacement:</label>
+                        <input type="text" id="ssn_replacement" name="ssn_replacement" placeholder="[SSN]">
+                    </div>
+                    <div class="form-row">
+                        <label for="ipv4_replacement">IPv4 Replacement:</label>
+                        <input type="text" id="ipv4_replacement" name="ipv4_replacement" placeholder="[IP]">
+                    </div>
+                </div>
+
+                <!-- Monitoring Settings -->
+                <div id="monitoring-section" class="config-section" style="display: none;">
+                    <h3>⏱️ Monitoring Settings</h3>
+                    <div class="form-row">
+                        <label for="monitoring_interval_ms">Monitoring Interval (ms):</label>
+                        <input type="number" id="monitoring_interval_ms" name="monitoring_interval_ms" min="100" step="100">
+                    </div>
+                    <label>
+                        <input type="checkbox" id="notify_on_filter" name="notify_on_filter">
+                        Show Notifications When Filtering
+                    </label>
+                </div>
+
+                <!-- Custom Patterns -->
+                <div id="custom_patterns-section" class="config-section" style="display: none;">
+                    <h3>🎯 Custom Regex Patterns (Optional)</h3>
+                    <div class="form-row">
+                        <label for="custom_email_pattern">Email Pattern:</label>
+                        <input type="text" id="custom_email_pattern" name="custom_email_pattern" placeholder="Leave empty for default">
+                    </div>
+                    <div class="form-row">
+                        <label for="custom_phone_pattern">Phone Pattern:</label>
+                        <input type="text" id="custom_phone_pattern" name="custom_phone_pattern" placeholder="Leave empty for default">
+                    </div>
+                    <div class="form-row">
+                        <label for="custom_credit_card_pattern">Credit Card Pattern:</label>
+                        <input type="text" id="custom_credit_card_pattern" name="custom_credit_card_pattern" placeholder="Leave empty for default">
+                    </div>
+                    <div class="form-row">
+                        <label for="custom_ssn_pattern">SSN Pattern:</label>
+                        <input type="text" id="custom_ssn_pattern" name="custom_ssn_pattern" placeholder="Leave empty for default">
+                    </div>
+                    <div class="form-row">
+                        <label for="custom_ipv4_pattern">IPv4 Pattern:</label>
+                        <input type="text" id="custom_ipv4_pattern" name="custom_ipv4_pattern" placeholder="Leave empty for default">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button type="submit">💾 Save Configuration</button>
+                    <button type="button" onclick="loadConfig()">🔄 Reload</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Logs Tab -->
+        <div id="logs-tab" class="tab-content">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="value" id="total-logs">0</div>
+                    <div class="label">Total Logs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="value" id="filtered-count">0</div>
+                    <div class="label">Items Filtered</div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="loadLogs(currentPage)">🔄 Refresh</button>
+                <button onclick="clearLogs()" class="secondary">🗑️ Clear Logs</button>
+            </div>
+
+            <div id="logs-container">
+                <div class="empty-state">
+                    <p>No logs yet. Start monitoring to see filtered data.</p>
+                </div>
+            </div>
+
+            <div class="pagination">
+                <button id="prev-page" onclick="prevPage()" disabled>← Previous</button>
+                <span id="page-info">Page 1 / 1</span>
+                <button id="next-page" onclick="nextPage()" disabled>Next →</button>
+            </div>
+        </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>
