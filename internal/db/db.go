@@ -1,16 +1,74 @@
 package db
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
-var db *sql.DB
+var db *gorm.DB
+
+// ConfigModel represents the configuration table (GORM model)
+type ConfigModel struct {
+	ID                      uint   `gorm:"primaryKey;check:id=1"`
+	DetectEmails            bool   `gorm:"default:true"`
+	DetectPhones            bool   `gorm:"default:true"`
+	DetectCreditCards       bool   `gorm:"default:true"`
+	DetectSSNs              bool   `gorm:"default:true"`
+	DetectIPV4              bool   `gorm:"default:true"`
+	CustomEmailPattern      string `gorm:"default:''"`
+	CustomPhonePattern      string `gorm:"default:''"`
+	CustomCreditCardPattern string `gorm:"default:''"`
+	CustomSSNPattern        string `gorm:"default:''"`
+	CustomIPV4Pattern       string `gorm:"default:''"`
+	EmailReplacement        string `gorm:"default:'security@example.com'"`
+	PhoneReplacement        string `gorm:"default:'+1-555-123-4567'"`
+	CreditCardReplacement   string `gorm:"default:'XXXX-XXXX-XXXX-XXXX'"`
+	SSNReplacement          string `gorm:"default:'XXX-XX-XXXX'"`
+	IPV4Replacement         string `gorm:"default:'0.0.0.0'"`
+	MonitoringIntervalMs    int    `gorm:"default:500"`
+	NotifyOnFilter          bool   `gorm:"default:true"`
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+}
+
+func (ConfigModel) TableName() string {
+	return "config"
+}
+
+// StringMatchPatternModel represents a string match pattern (GORM model)
+type StringMatchPatternModel struct {
+	ID          uint   `gorm:"primaryKey;autoIncrement"`
+	Name        string `gorm:"not null"`
+	Pattern     string `gorm:"not null"`
+	Enabled     bool   `gorm:"default:true"`
+	Replacement string `gorm:"not null"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (StringMatchPatternModel) TableName() string {
+	return "string_match_patterns"
+}
+
+// LogEntryModel represents a log entry (GORM model)
+type LogEntryModel struct {
+	ID           uint      `gorm:"primaryKey;autoIncrement"`
+	Timestamp    time.Time `gorm:"index:idx_logs_timestamp,sort:desc;default:CURRENT_TIMESTAMP"`
+	OriginalText string    `gorm:"not null"`
+	FilteredText string    `gorm:"not null"`
+	Detections   string    `gorm:"not null"` // JSON string
+	CreatedAt    time.Time
+}
+
+func (LogEntryModel) TableName() string {
+	return "logs"
+}
 
 // Initialize initializes the database connection and creates tables if needed
 func Initialize() error {
@@ -19,16 +77,26 @@ func Initialize() error {
 		return err
 	}
 
-	database, err := sql.Open("sqlite3", dbPath)
+	database, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to open database: %v", err)
 	}
 
 	db = database
 
-	// Create tables
-	if err := createTables(); err != nil {
-		return fmt.Errorf("failed to create tables: %v", err)
+	// Auto migrate tables
+	if err := db.AutoMigrate(&ConfigModel{}, &StringMatchPatternModel{}, &LogEntryModel{}); err != nil {
+		return fmt.Errorf("failed to migrate tables: %v", err)
+	}
+
+	// Insert default config if not exists
+	var count int64
+	db.Model(&ConfigModel{}).Count(&count)
+	if count == 0 {
+		defaultConfig := &ConfigModel{ID: 1}
+		if err := db.Create(defaultConfig).Error; err != nil {
+			return fmt.Errorf("failed to create default config: %v", err)
+		}
 	}
 
 	return nil
@@ -37,13 +105,17 @@ func Initialize() error {
 // Close closes the database connection
 func Close() error {
 	if db != nil {
-		return db.Close()
+		sqlDB, err := db.DB()
+		if err != nil {
+			return err
+		}
+		return sqlDB.Close()
 	}
 	return nil
 }
 
 // GetDB returns the database instance
-func GetDB() *sql.DB {
+func GetDB() *gorm.DB {
 	return db
 }
 
@@ -62,93 +134,7 @@ func getDBPath() (string, error) {
 	return filepath.Join(configDir, "config.db"), nil
 }
 
-// createTables creates the necessary database tables
-func createTables() error {
-	// Configuration table - stores a single row with all config
-	configTableSQL := `
-	CREATE TABLE IF NOT EXISTS config (
-		id INTEGER PRIMARY KEY CHECK (id = 1),
-		detect_emails INTEGER NOT NULL DEFAULT 1,
-		detect_phones INTEGER NOT NULL DEFAULT 1,
-		detect_credit_cards INTEGER NOT NULL DEFAULT 1,
-		detect_ssns INTEGER NOT NULL DEFAULT 1,
-		detect_ipv4 INTEGER NOT NULL DEFAULT 1,
-		
-		custom_email_pattern TEXT DEFAULT '',
-		custom_phone_pattern TEXT DEFAULT '',
-		custom_credit_card_pattern TEXT DEFAULT '',
-		custom_ssn_pattern TEXT DEFAULT '',
-		custom_ipv4_pattern TEXT DEFAULT '',
-		
-		email_replacement TEXT DEFAULT 'security@example.com',
-		phone_replacement TEXT DEFAULT '+1-555-123-4567',
-		credit_card_replacement TEXT DEFAULT 'XXXX-XXXX-XXXX-XXXX',
-		ssn_replacement TEXT DEFAULT 'XXX-XX-XXXX',
-		ipv4_replacement TEXT DEFAULT '0.0.0.0',
-		
-		monitoring_interval_ms INTEGER NOT NULL DEFAULT 500,
-		notify_on_filter INTEGER NOT NULL DEFAULT 1,
-		
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);`
-
-	if _, err := db.Exec(configTableSQL); err != nil {
-		return fmt.Errorf("failed to create config table: %v", err)
-	}
-
-	// String match patterns table
-	stringPatternsTableSQL := `
-	CREATE TABLE IF NOT EXISTS string_match_patterns (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		pattern TEXT NOT NULL,
-		enabled INTEGER NOT NULL DEFAULT 1,
-		replacement TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);`
-
-	if _, err := db.Exec(stringPatternsTableSQL); err != nil {
-		return fmt.Errorf("failed to create string_match_patterns table: %v", err)
-	}
-
-	// Logs table
-	logsTableSQL := `
-	CREATE TABLE IF NOT EXISTS logs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-		original_text TEXT NOT NULL,
-		filtered_text TEXT NOT NULL,
-		detections TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	
-	CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp DESC);`
-
-	if _, err := db.Exec(logsTableSQL); err != nil {
-		return fmt.Errorf("failed to create logs table: %v", err)
-	}
-
-	// Insert default config if not exists
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM config").Scan(&count)
-	if err != nil {
-		return fmt.Errorf("failed to check config existence: %v", err)
-	}
-
-	if count == 0 {
-		insertDefaultSQL := `
-		INSERT INTO config (id) VALUES (1);`
-		if _, err := db.Exec(insertDefaultSQL); err != nil {
-			return fmt.Errorf("failed to insert default config: %v", err)
-		}
-	}
-
-	return nil
-}
-
-// StringMatchPattern represents a string match pattern
+// StringMatchPattern represents a string match pattern (API model)
 type StringMatchPattern struct {
 	ID          int    `json:"id"`
 	Name        string `json:"name"`
@@ -157,7 +143,7 @@ type StringMatchPattern struct {
 	Replacement string `json:"replacement"`
 }
 
-// Config represents the application configuration
+// Config represents the application configuration (API model)
 type Config struct {
 	DetectEmails      bool `json:"detect_emails"`
 	DetectPhones      bool `json:"detect_phones"`
@@ -185,148 +171,83 @@ type Config struct {
 
 // LoadConfig loads the configuration from the database
 func LoadConfig() (Config, error) {
-	var cfg Config
-
-	row := db.QueryRow(`
-		SELECT 
-			detect_emails, detect_phones, detect_credit_cards, detect_ssns, detect_ipv4,
-			custom_email_pattern, custom_phone_pattern, custom_credit_card_pattern, 
-			custom_ssn_pattern, custom_ipv4_pattern,
-			email_replacement, phone_replacement, credit_card_replacement, 
-			ssn_replacement, ipv4_replacement,
-			monitoring_interval_ms, notify_on_filter
-		FROM config WHERE id = 1
-	`)
-
-	var detectEmails, detectPhones, detectCreditCards, detectSSNs, detectIPV4 int
-	var notifyOnFilter int
-
-	err := row.Scan(
-		&detectEmails, &detectPhones, &detectCreditCards, &detectSSNs, &detectIPV4,
-		&cfg.CustomEmailPattern, &cfg.CustomPhonePattern, &cfg.CustomCreditCardPattern,
-		&cfg.CustomSSNPattern, &cfg.CustomIPV4Pattern,
-		&cfg.EmailReplacement, &cfg.PhoneReplacement, &cfg.CreditCardReplacement,
-		&cfg.SSNReplacement, &cfg.IPV4Replacement,
-		&cfg.MonitoringInterval, &notifyOnFilter,
-	)
-
-	if err != nil {
-		return cfg, fmt.Errorf("failed to load config: %v", err)
+	var configModel ConfigModel
+	if err := db.First(&configModel, 1).Error; err != nil {
+		return Config{}, fmt.Errorf("failed to load config: %v", err)
 	}
-
-	// Convert integers to booleans
-	cfg.DetectEmails = detectEmails == 1
-	cfg.DetectPhones = detectPhones == 1
-	cfg.DetectCreditCards = detectCreditCards == 1
-	cfg.DetectSSNs = detectSSNs == 1
-	cfg.DetectIPV4 = detectIPV4 == 1
-	cfg.NotifyOnFilter = notifyOnFilter == 1
 
 	// Load string match patterns
 	patterns, err := LoadStringMatchPatterns()
 	if err != nil {
-		return cfg, fmt.Errorf("failed to load string match patterns: %v", err)
+		return Config{}, fmt.Errorf("failed to load string match patterns: %v", err)
 	}
-	cfg.StringMatchPatterns = patterns
+
+	cfg := Config{
+		DetectEmails:            configModel.DetectEmails,
+		DetectPhones:            configModel.DetectPhones,
+		DetectCreditCards:       configModel.DetectCreditCards,
+		DetectSSNs:              configModel.DetectSSNs,
+		DetectIPV4:              configModel.DetectIPV4,
+		CustomEmailPattern:      configModel.CustomEmailPattern,
+		CustomPhonePattern:      configModel.CustomPhonePattern,
+		CustomCreditCardPattern: configModel.CustomCreditCardPattern,
+		CustomSSNPattern:        configModel.CustomSSNPattern,
+		CustomIPV4Pattern:       configModel.CustomIPV4Pattern,
+		EmailReplacement:        configModel.EmailReplacement,
+		PhoneReplacement:        configModel.PhoneReplacement,
+		CreditCardReplacement:   configModel.CreditCardReplacement,
+		SSNReplacement:          configModel.SSNReplacement,
+		IPV4Replacement:         configModel.IPV4Replacement,
+		MonitoringInterval:      configModel.MonitoringIntervalMs,
+		NotifyOnFilter:          configModel.NotifyOnFilter,
+		StringMatchPatterns:     patterns,
+	}
 
 	return cfg, nil
 }
 
 // SaveConfig saves the configuration to the database
 func SaveConfig(cfg Config) error {
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %v", err)
-	}
-	defer tx.Rollback()
-
-	// Convert booleans to integers
-	detectEmails := 0
-	if cfg.DetectEmails {
-		detectEmails = 1
-	}
-	detectPhones := 0
-	if cfg.DetectPhones {
-		detectPhones = 1
-	}
-	detectCreditCards := 0
-	if cfg.DetectCreditCards {
-		detectCreditCards = 1
-	}
-	detectSSNs := 0
-	if cfg.DetectSSNs {
-		detectSSNs = 1
-	}
-	detectIPV4 := 0
-	if cfg.DetectIPV4 {
-		detectIPV4 = 1
-	}
-	notifyOnFilter := 0
-	if cfg.NotifyOnFilter {
-		notifyOnFilter = 1
+	configModel := ConfigModel{
+		ID:                      1,
+		DetectEmails:            cfg.DetectEmails,
+		DetectPhones:            cfg.DetectPhones,
+		DetectCreditCards:       cfg.DetectCreditCards,
+		DetectSSNs:              cfg.DetectSSNs,
+		DetectIPV4:              cfg.DetectIPV4,
+		CustomEmailPattern:      cfg.CustomEmailPattern,
+		CustomPhonePattern:      cfg.CustomPhonePattern,
+		CustomCreditCardPattern: cfg.CustomCreditCardPattern,
+		CustomSSNPattern:        cfg.CustomSSNPattern,
+		CustomIPV4Pattern:       cfg.CustomIPV4Pattern,
+		EmailReplacement:        cfg.EmailReplacement,
+		PhoneReplacement:        cfg.PhoneReplacement,
+		CreditCardReplacement:   cfg.CreditCardReplacement,
+		SSNReplacement:          cfg.SSNReplacement,
+		IPV4Replacement:         cfg.IPV4Replacement,
+		MonitoringIntervalMs:    cfg.MonitoringInterval,
+		NotifyOnFilter:          cfg.NotifyOnFilter,
 	}
 
-	_, err = tx.Exec(`
-		UPDATE config SET
-			detect_emails = ?,
-			detect_phones = ?,
-			detect_credit_cards = ?,
-			detect_ssns = ?,
-			detect_ipv4 = ?,
-			custom_email_pattern = ?,
-			custom_phone_pattern = ?,
-			custom_credit_card_pattern = ?,
-			custom_ssn_pattern = ?,
-			custom_ipv4_pattern = ?,
-			email_replacement = ?,
-			phone_replacement = ?,
-			credit_card_replacement = ?,
-			ssn_replacement = ?,
-			ipv4_replacement = ?,
-			monitoring_interval_ms = ?,
-			notify_on_filter = ?,
-			updated_at = CURRENT_TIMESTAMP
-		WHERE id = 1
-	`,
-		detectEmails, detectPhones, detectCreditCards, detectSSNs, detectIPV4,
-		cfg.CustomEmailPattern, cfg.CustomPhonePattern, cfg.CustomCreditCardPattern,
-		cfg.CustomSSNPattern, cfg.CustomIPV4Pattern,
-		cfg.EmailReplacement, cfg.PhoneReplacement, cfg.CreditCardReplacement,
-		cfg.SSNReplacement, cfg.IPV4Replacement,
-		cfg.MonitoringInterval, notifyOnFilter,
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to update config: %v", err)
-	}
-
-	return tx.Commit()
+	return db.Save(&configModel).Error
 }
 
 // LoadStringMatchPatterns loads all string match patterns from the database
 func LoadStringMatchPatterns() ([]StringMatchPattern, error) {
-	rows, err := db.Query(`
-		SELECT id, name, pattern, enabled, replacement
-		FROM string_match_patterns
-		ORDER BY id
-	`)
-	if err != nil {
+	var models []StringMatchPatternModel
+	if err := db.Order("id").Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to query string match patterns: %v", err)
 	}
-	defer rows.Close()
 
-	var patterns []StringMatchPattern
-	for rows.Next() {
-		var p StringMatchPattern
-		var enabled int
-
-		err := rows.Scan(&p.ID, &p.Name, &p.Pattern, &enabled, &p.Replacement)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan string match pattern: %v", err)
+	patterns := make([]StringMatchPattern, len(models))
+	for i, m := range models {
+		patterns[i] = StringMatchPattern{
+			ID:          int(m.ID),
+			Name:        m.Name,
+			Pattern:     m.Pattern,
+			Enabled:     m.Enabled,
+			Replacement: m.Replacement,
 		}
-
-		p.Enabled = enabled == 1
-		patterns = append(patterns, p)
 	}
 
 	return patterns, nil
@@ -334,33 +255,20 @@ func LoadStringMatchPatterns() ([]StringMatchPattern, error) {
 
 // SaveStringMatchPattern saves or updates a string match pattern
 func SaveStringMatchPattern(p StringMatchPattern) error {
-	enabled := 0
-	if p.Enabled {
-		enabled = 1
+	model := StringMatchPatternModel{
+		ID:          uint(p.ID),
+		Name:        p.Name,
+		Pattern:     p.Pattern,
+		Enabled:     p.Enabled,
+		Replacement: p.Replacement,
 	}
 
-	if p.ID == 0 {
-		// Insert new pattern
-		_, err := db.Exec(`
-			INSERT INTO string_match_patterns (name, pattern, enabled, replacement)
-			VALUES (?, ?, ?, ?)
-		`, p.Name, p.Pattern, enabled, p.Replacement)
-		return err
-	}
-
-	// Update existing pattern
-	_, err := db.Exec(`
-		UPDATE string_match_patterns
-		SET name = ?, pattern = ?, enabled = ?, replacement = ?, updated_at = CURRENT_TIMESTAMP
-		WHERE id = ?
-	`, p.Name, p.Pattern, enabled, p.Replacement, p.ID)
-	return err
+	return db.Save(&model).Error
 }
 
 // DeleteStringMatchPattern deletes a string match pattern by ID
 func DeleteStringMatchPattern(id int) error {
-	_, err := db.Exec("DELETE FROM string_match_patterns WHERE id = ?", id)
-	return err
+	return db.Delete(&StringMatchPatternModel{}, id).Error
 }
 
 // MarshalConfig converts Config to JSON (for compatibility)
@@ -375,7 +283,7 @@ func UnmarshalConfig(data []byte) (Config, error) {
 	return cfg, err
 }
 
-// LogEntry represents a filter log entry
+// LogEntry represents a filter log entry (API model)
 type LogEntry struct {
 	ID           int      `json:"id"`
 	Timestamp    string   `json:"timestamp"`
@@ -391,12 +299,14 @@ func AddLog(originalText, filteredText string, detections []string) error {
 		return fmt.Errorf("failed to marshal detections: %v", err)
 	}
 
-	_, err = db.Exec(`
-		INSERT INTO logs (original_text, filtered_text, detections)
-		VALUES (?, ?, ?)
-	`, originalText, filteredText, string(detectionsJSON))
+	logModel := LogEntryModel{
+		Timestamp:    time.Now(),
+		OriginalText: originalText,
+		FilteredText: filteredText,
+		Detections:   string(detectionsJSON),
+	}
 
-	return err
+	return db.Create(&logModel).Error
 }
 
 // GetLogs retrieves logs from the database with optional limit
@@ -405,36 +315,12 @@ func GetLogs(limit int) ([]LogEntry, error) {
 		limit = 100 // Default limit
 	}
 
-	rows, err := db.Query(`
-		SELECT id, timestamp, original_text, filtered_text, detections
-		FROM logs
-		ORDER BY timestamp DESC
-		LIMIT ?
-	`, limit)
-	if err != nil {
+	var models []LogEntryModel
+	if err := db.Order("timestamp DESC").Limit(limit).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to query logs: %v", err)
 	}
-	defer rows.Close()
 
-	var logs []LogEntry
-	for rows.Next() {
-		var log LogEntry
-		var detectionsJSON string
-
-		err := rows.Scan(&log.ID, &log.Timestamp, &log.OriginalText, &log.FilteredText, &detectionsJSON)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan log entry: %v", err)
-		}
-
-		// Unmarshal detections
-		if err := json.Unmarshal([]byte(detectionsJSON), &log.Detections); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal detections: %v", err)
-		}
-
-		logs = append(logs, log)
-	}
-
-	return logs, nil
+	return convertLogModelsToEntries(models)
 }
 
 // GetLogsWithPagination retrieves logs with pagination support
@@ -448,33 +334,30 @@ func GetLogsWithPagination(page, pageSize int) ([]LogEntry, error) {
 
 	offset := (page - 1) * pageSize
 
-	rows, err := db.Query(`
-		SELECT id, timestamp, original_text, filtered_text, detections
-		FROM logs
-		ORDER BY timestamp DESC
-		LIMIT ? OFFSET ?
-	`, pageSize, offset)
-	if err != nil {
+	var models []LogEntryModel
+	if err := db.Order("timestamp DESC").Limit(pageSize).Offset(offset).Find(&models).Error; err != nil {
 		return nil, fmt.Errorf("failed to query logs: %v", err)
 	}
-	defer rows.Close()
 
-	var logs []LogEntry
-	for rows.Next() {
-		var log LogEntry
-		var detectionsJSON string
+	return convertLogModelsToEntries(models)
+}
 
-		err := rows.Scan(&log.ID, &log.Timestamp, &log.OriginalText, &log.FilteredText, &detectionsJSON)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan log entry: %v", err)
-		}
-
-		// Unmarshal detections
-		if err := json.Unmarshal([]byte(detectionsJSON), &log.Detections); err != nil {
+// convertLogModelsToEntries converts GORM models to API models
+func convertLogModelsToEntries(models []LogEntryModel) ([]LogEntry, error) {
+	logs := make([]LogEntry, len(models))
+	for i, m := range models {
+		var detections []string
+		if err := json.Unmarshal([]byte(m.Detections), &detections); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal detections: %v", err)
 		}
 
-		logs = append(logs, log)
+		logs[i] = LogEntry{
+			ID:           int(m.ID),
+			Timestamp:    m.Timestamp.Format(time.RFC3339),
+			OriginalText: m.OriginalText,
+			FilteredText: m.FilteredText,
+			Detections:   detections,
+		}
 	}
 
 	return logs, nil
@@ -482,13 +365,12 @@ func GetLogsWithPagination(page, pageSize int) ([]LogEntry, error) {
 
 // ClearLogs removes all log entries from the database
 func ClearLogs() error {
-	_, err := db.Exec("DELETE FROM logs")
-	return err
+	return db.Where("1 = 1").Delete(&LogEntryModel{}).Error
 }
 
 // GetLogCount returns the total number of log entries
 func GetLogCount() (int, error) {
-	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM logs").Scan(&count)
-	return count, err
+	var count int64
+	err := db.Model(&LogEntryModel{}).Count(&count).Error
+	return int(count), err
 }
