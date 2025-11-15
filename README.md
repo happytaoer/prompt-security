@@ -4,6 +4,8 @@
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
 
+![Prompt Security Screenshot](./screenshot.png)
+
 > **Protect your clipboard before you paste!**
 > 
 > Prompt Security is a blazing-fast, zero-config Go tool that automatically detects and filters sensitive data from your clipboard—before it can leak to large language models (LLMs) or online tools.
