@@ -2,6 +2,7 @@ package patterns
 
 import (
 	"regexp"
+	"sync"
 
 	"github.com/happytaoer/prompt-security/internal/config"
 )
@@ -40,11 +41,52 @@ var (
 	defaultIPV4Pattern       = regexp.MustCompile(DefaultIPV4PatternStr)
 )
 
+// PatternCache caches compiled regular expressions to avoid recompilation
+type PatternCache struct {
+	mu       sync.RWMutex
+	patterns map[string]*regexp.Regexp
+}
+
+// globalCache is the global pattern cache instance
+var globalCache = &PatternCache{
+	patterns: make(map[string]*regexp.Regexp),
+}
+
+// Get retrieves a compiled pattern from cache or compiles and caches it
+func (pc *PatternCache) Get(key string, patternStr string) (*regexp.Regexp, error) {
+	// Fast path: read lock for cache hit
+	pc.mu.RLock()
+	if pattern, ok := pc.patterns[key]; ok {
+		pc.mu.RUnlock()
+		return pattern, nil
+	}
+	pc.mu.RUnlock()
+
+	// Slow path: compile and cache
+	pattern, err := regexp.Compile(patternStr)
+	if err != nil {
+		return nil, err
+	}
+
+	pc.mu.Lock()
+	pc.patterns[key] = pattern
+	pc.mu.Unlock()
+
+	return pattern, nil
+}
+
+// Clear removes all cached patterns (useful for testing or config reload)
+func (pc *PatternCache) Clear() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+	pc.patterns = make(map[string]*regexp.Regexp)
+}
+
 // GetEmailPattern returns the appropriate email pattern based on configuration
 func GetEmailPattern(cfg *config.Config) *regexp.Regexp {
 	if cfg != nil && cfg.CustomEmailPattern != "" {
-		// Try to compile custom pattern, fallback to default if it fails
-		pattern, err := regexp.Compile(cfg.CustomEmailPattern)
+		// Try to get from cache or compile custom pattern, fallback to default if it fails
+		pattern, err := globalCache.Get("email", cfg.CustomEmailPattern)
 		if err == nil {
 			return pattern
 		}
@@ -55,8 +97,8 @@ func GetEmailPattern(cfg *config.Config) *regexp.Regexp {
 // GetPhonePattern returns the appropriate phone pattern based on configuration
 func GetPhonePattern(cfg *config.Config) *regexp.Regexp {
 	if cfg != nil && cfg.CustomPhonePattern != "" {
-		// Try to compile custom pattern, fallback to default if it fails
-		pattern, err := regexp.Compile(cfg.CustomPhonePattern)
+		// Try to get from cache or compile custom pattern, fallback to default if it fails
+		pattern, err := globalCache.Get("phone", cfg.CustomPhonePattern)
 		if err == nil {
 			return pattern
 		}
@@ -67,8 +109,8 @@ func GetPhonePattern(cfg *config.Config) *regexp.Regexp {
 // GetCreditCardPattern returns the appropriate credit card pattern based on configuration
 func GetCreditCardPattern(cfg *config.Config) *regexp.Regexp {
 	if cfg != nil && cfg.CustomCreditCardPattern != "" {
-		// Try to compile custom pattern, fallback to default if it fails
-		pattern, err := regexp.Compile(cfg.CustomCreditCardPattern)
+		// Try to get from cache or compile custom pattern, fallback to default if it fails
+		pattern, err := globalCache.Get("creditCard", cfg.CustomCreditCardPattern)
 		if err == nil {
 			return pattern
 		}
@@ -79,8 +121,8 @@ func GetCreditCardPattern(cfg *config.Config) *regexp.Regexp {
 // GetSSNPattern returns the appropriate SSN pattern based on configuration
 func GetSSNPattern(cfg *config.Config) *regexp.Regexp {
 	if cfg != nil && cfg.CustomSSNPattern != "" {
-		// Try to compile custom pattern, fallback to default if it fails
-		pattern, err := regexp.Compile(cfg.CustomSSNPattern)
+		// Try to get from cache or compile custom pattern, fallback to default if it fails
+		pattern, err := globalCache.Get("ssn", cfg.CustomSSNPattern)
 		if err == nil {
 			return pattern
 		}
@@ -91,8 +133,8 @@ func GetSSNPattern(cfg *config.Config) *regexp.Regexp {
 // GetIPV4Pattern returns the appropriate IPv4 pattern based on configuration
 func GetIPV4Pattern(cfg *config.Config) *regexp.Regexp {
 	if cfg != nil && cfg.CustomIPV4Pattern != "" {
-		// Try to compile custom pattern, fallback to default if it fails
-		pattern, err := regexp.Compile(cfg.CustomIPV4Pattern)
+		// Try to get from cache or compile custom pattern, fallback to default if it fails
+		pattern, err := globalCache.Get("ipv4", cfg.CustomIPV4Pattern)
 		if err == nil {
 			return pattern
 		}
