@@ -303,8 +303,8 @@ let autoRefreshInterval;
 function startAutoRefresh() {
     autoRefreshInterval = setInterval(() => {
         const logsTab = document.getElementById('logs-tab');
-        if (logsTab.classList.contains('active')) {
-            loadLogs();
+        if (logsTab && logsTab.style.display !== 'none') {
+            loadLogs(currentPage);
         }
     }, 5000);
 }
